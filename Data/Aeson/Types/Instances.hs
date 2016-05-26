@@ -1693,11 +1693,16 @@ contramapToJSONKeyFunction h x = case x of
     ToJSONKeyText (f,g) -> ToJSONKeyText (f . h, g . h)
     ToJSONKeyValue (f,g) -> ToJSONKeyValue (f . h, g . h)
 
-mapFromJSONKeyFunction :: (a -> b) -> FromJSONKeyFunction a -> FromJSONKeyFunction b
+-- I'm not sure if the 'FromJSONKeyCoerce' branch makes this not be
+-- a valid fmap implementation.
+mapFromJSONKeyFunction :: forall a b. (a -> b) -> FromJSONKeyFunction a -> FromJSONKeyFunction b
 mapFromJSONKeyFunction h x = case x of
+    FromJSONKeyCoerce -> FromJSONKeyText (h . uc)
     FromJSONKeyText f -> FromJSONKeyText (h . f)
     FromJSONKeyTextParser f -> FromJSONKeyTextParser (fmap h . f)
     FromJSONKeyValue f -> FromJSONKeyValue (fmap h . f)
+    where uc :: Text -> a
+          uc = unsafeCoerce
 
 -- | @withObject expected f value@ applies @f@ to the 'Object' when @value@ is an @Object@
 --   and fails using @'typeMismatch' expected@ otherwise.
