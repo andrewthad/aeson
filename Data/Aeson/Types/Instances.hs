@@ -746,12 +746,23 @@ instance (ToJSON v, ToJSONKey k) => ToJSON (H.HashMap k v) where
             pairEncoding f (a, b) = tuple $ fromEncoding (f a) >*< builder b
     {-# INLINE toEncoding #-}
 
+mapKeysRewritable :: (Eq c, Hashable c) => (a -> c) -> Parser (H.HashMap a b) -> Parser (H.HashMap c b)
+mapKeysRewritable f = fmap (mapKey f)
+{-# NOINLINE[2] mapKeysRewritable #-}
+
+{-# RULES
+  "mapKeysRewriteable/only" [~2] forall xs. mapKeysRewritable id xs = xs
+  #-}
+
+-- {-# SPECIALIZE parseJSON :: FromJSON a => Value -> Parser (H.HashMap Text a) #-}
+
 instance (FromJSON v, FromJSONKey k, Eq k, Hashable k) => FromJSON (H.HashMap k v) where
+    {-# SPECIALIZE instance FromJSON a => FromJSON (H.HashMap Text a) #-}
     parseJSON = case fromJSONKey of
         FromJSONKeyCoerce -> withObject "HashMap ~Text v" $
             uc . H.traverseWithKey (\k v -> parseJSON v <?> Key k)
         FromJSONKeyText f -> withObject "HashMap k v" $
-            fmap (mapKey f) . H.traverseWithKey (\k v -> parseJSON v <?> Key k)
+            mapKeysRewritable f . H.traverseWithKey (\k v -> parseJSON v <?> Key k)
         FromJSONKeyTextParser f -> withObject "HashMap k v" $
             H.foldrWithKey (\k v m -> H.insert <$> f k <*> (parseJSON v <?> Key k) <*> m) (pure H.empty)
         FromJSONKeyValue f -> withArray "Map k v" $ \arr ->
@@ -1629,7 +1640,7 @@ instance ToJSONKey Text where
     toJSONKey = ToJSONKeyText (id,toEncoding)
 
 instance FromJSONKey Text where
-    fromJSONKey = FromJSONKeyCoerce
+    fromJSONKey = FromJSONKeyText id
 
 -- | TODO: where ToJSONKey instance
 instance FromJSONKey b => FromJSONKey (Tagged a b) where
