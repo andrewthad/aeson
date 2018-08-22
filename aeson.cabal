@@ -149,6 +149,8 @@ library
     ghc-options: -O2
 
   include-dirs: include
+  if impl(ghcjs)
+    build-depends: ghcjs-base, transformers
   if impl(ghcjs) || !flag(cffi)
     hs-source-dirs: pure
     other-modules: Data.Aeson.Parser.UnescapePure
